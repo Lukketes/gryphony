@@ -5,27 +5,21 @@ from typing import Set, Optional, List
 
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-TARGET_DIR: str = r"D:\Coding\Projects\gryphony\files"
+# --- Configurações ---
+# A pasta alvo deve ser um caminho relativo ou absoluto.
+# Para portabilidade, evite caminhos hardcoded específicos de SO (como 'D:\...').
+# Usaremos um caminho relativo para o diretório atual como um bom padrão.
+TARGET_DIR: str = "files_to_encrypt"
 ALLOWED_EXTENSIONS: Set[str] = {'.jpg', '.jpeg', '.png', '.pdf', '.txt', '.docx', '.xlsx'}
 KEY_FILE: str = ".encryption_key.bin"
 SALT_FILE: str = ".salt.bin"
 ENCRYPTED_SUFFIX: str = ".encrypted"
 
 
-def get_kdf_iterations() -> int:
-    """Retorna o número de iterações recomendado para PBKDF2HMAC."""
-    # O número de iterações recomendado pode mudar com o tempo.
-    # Usar o valor recomendado pela biblioteca é mais seguro.
-    return PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=os.urandom(16),  # Salt temporário para cálculo
-        iterations=1,
-    ).iterations
+
 
 
 def derive_key_from_password(password: str, salt: bytes) -> bytes:
@@ -34,7 +28,7 @@ def derive_key_from_password(password: str, salt: bytes) -> bytes:
         algorithm=hashes.SHA256(),
         length=32,
         salt=salt,
-        iterations=get_kdf_iterations(),
+        iterations=600000, # Valor seguro e estável para PBKDF2HMAC (Jun/2024)
     )
     # A chave deve ser codificada em base64 urlsafe para Fernet
     key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
@@ -42,9 +36,13 @@ def derive_key_from_password(password: str, salt: bytes) -> bytes:
 
 
 def setup_password() -> bool:
-
+    """
+    Configura a senha inicial, gera um salt, deriva a chave e salva ambos em arquivos.
+    Retorna True se a configuração for bem-sucedida, False caso contrário.
+    """
     print("=== CONFIGURAÇÃO INICIAL ===")
-
+    
+    # 1. Coleta e validação da senha
     while True:
         password = getpass.getpass("Crie uma senha forte: ")
         confirm = getpass.getpass("Confirme a senha: ")
@@ -84,7 +82,10 @@ def setup_password() -> bool:
 
 
 def verify_password() -> Optional[bytes]:
-
+    """
+    Solicita a senha ao usuário, verifica se ela corresponde à chave salva
+    e retorna a chave Fernet se a verificação for bem-sucedida.
+    """
     # 1. Verifica a existência dos arquivos de configuração
     if not os.path.exists(SALT_FILE) or not os.path.exists(KEY_FILE):
         print("Erro: Arquivos de configuração de senha não encontrados. Por favor, configure a senha primeiro (Opção 1).")
@@ -113,7 +114,10 @@ def verify_password() -> Optional[bytes]:
 
 
 def list_files_to_encrypt(directory: str) -> List[str]:
-
+    """
+    Lista todos os arquivos na pasta que correspondem às extensões permitidas
+    e que AINDA NÃO estão criptografados.
+    """
     files_to_process: List[str] = []
 
     if not os.path.exists(directory):
@@ -137,7 +141,9 @@ def list_files_to_encrypt(directory: str) -> List[str]:
 
 
 def list_files_to_decrypt(directory: str) -> List[str]:
-
+    """
+    Lista todos os arquivos na pasta que possuem o sufixo de criptografia.
+    """
     files_to_process: List[str] = []
 
     if not os.path.exists(directory):
@@ -203,7 +209,7 @@ def encrypt_files(directory: str):
         except Exception as e:
             print(f"✗ {filename}: Erro inesperado: {e}")
 
-    print(f"\n{count} arquivo(s) criptografado(s)!")
+    print(f"\n✅ {count} arquivo(s) criptografado(s)!")
 
 
 def decrypt_files(directory: str):
@@ -219,7 +225,7 @@ def decrypt_files(directory: str):
         print("Nenhum arquivo criptografado encontrado.")
         return
 
-    print(f"\n{len(files)} arquivo(s) criptografado(s) encontrado(s)")
+    print(f"\n📁 {len(files)} arquivo(s) criptografado(s) encontrado(s)")
 
     count = 0
     for filepath in files:
@@ -251,7 +257,7 @@ def decrypt_files(directory: str):
         except Exception as e:
             print(f"✗ {filename}: Erro inesperado: {e}")
 
-    print(f"\n{count} arquivos descriptografados!")
+    print(f"\n✅ {count} arquivo(s) descriptografado(s)!")
 
 
 def menu():
@@ -289,6 +295,6 @@ if __name__ == "__main__":
             print("Saindo...")
             break
         else:
-            print("Opção inválida!")
+            print("❌ Opção inválida!")
 
         input("\nPressione ENTER para continuar...")
